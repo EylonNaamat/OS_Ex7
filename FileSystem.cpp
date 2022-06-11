@@ -162,7 +162,7 @@ int load_mount(const char* source){
 
 int find_inode(){
     for(int i = 0; i < superb->inodes_num; ++i){
-        if(inodes[i].first_block == -1 && inodes[i].type != 1){
+        if(inodes[i].first_block == -1 && inodes[i].type == -1){
 
             return i;
         }
@@ -190,7 +190,7 @@ int myopen(const char *pathname, int flags){
     int exist = 0;
     struct myopenfile new_file;
 
-    if(flags != 0 && flags != 1 && flags != 2){
+    if(flags != 64 && flags != 65 && flags != 66 && flags != 0 && flags != 1 && flags != 2){
         return -1;
     }
 
@@ -207,6 +207,9 @@ int myopen(const char *pathname, int flags){
         }
     }
     if(!exist){
+        if(flags < 64){
+            return -4;
+        }
         int inode_index = find_inode();
         int block_index = find_block();
 
@@ -283,7 +286,7 @@ ssize_t mywrite(int myfd, const void* buf, size_t count){
     if(open_files[myfd].flag == -1){
         return -2;
     }
-    if(open_files[myfd].flag != 1 && open_files[myfd].flag != 2){
+    if(open_files[myfd].flag != 1 && open_files[myfd].flag != 2 && open_files[myfd].flag != 65 && open_files[myfd].flag != 66){
         return -3;
     }
 
@@ -333,7 +336,7 @@ ssize_t myread(int myfd, void* buf, size_t count){
     if(open_files[myfd].flag == -1){
         return -2;
     }
-    if(open_files[myfd].flag != 0 && open_files[myfd].flag != 2){
+    if(open_files[myfd].flag != 0 && open_files[myfd].flag != 2 && open_files[myfd].flag != 64 && open_files[myfd].flag != 66){
         return -3;
     }
 
@@ -406,6 +409,7 @@ off_t mylseek(int myfd, off_t offset, int whence){
 
 
 myDIR *myopendir(const char* name){
+    int flag_exist = 0;
     for(int i = 0; i < superb->inodes_num; ++i){
         if(!strcmp(inodes[i].name, name)){
             if(inodes[i].type == 1){
@@ -413,6 +417,7 @@ myDIR *myopendir(const char* name){
                 ans->inode_num = i;
                 ans->inode_next = i;
                 strcpy(ans->name, name);
+                flag_exist = 1;
                 for(int j = 0; j < MAX_FILES; ++j){
                     if(open_files[j].flag == -1){
                         open_files[j].flag = 0;
@@ -428,6 +433,38 @@ myDIR *myopendir(const char* name){
                 return ans;
             }
         }
+    }
+    if(!flag_exist){
+        myDIR * ans2 = (myDIR*)(malloc(sizeof(myDIR)));
+        int f_i = find_inode();
+        int b_i = find_block();
+        if(f_i == -1 || b_i == -1){
+            return NULL;
+        }
+        strcpy(inodes[f_i].name, name);
+        inodes[f_i].type = 1;
+        inodes[f_i].first_block = b_i;
+        blocks[b_i].in_use = 1;
+        blocks[b_i].next_block = -1;
+        if(f_i > 0){
+            inodes[f_i-1].next = f_i;
+        }
+        ans2->inode_num = f_i;
+        ans2->inode_next = f_i;
+        strcpy(ans2->name, name);
+        for(int j = 0; j < MAX_FILES; ++j){
+            if(open_files[j].flag == -1){
+                open_files[j].flag = 0;
+                open_files[j].curr_inode.first_block = inodes[ans2->inode_num].first_block;
+                open_files[j].curr_inode.size = inodes[ans2->inode_num].size;
+                strcpy(open_files[j].curr_inode.name, inodes[ans2->inode_num].name);
+                open_files[j].curr_inode.type = inodes[ans2->inode_num].type;
+                open_files[j].curr_inode.next = inodes[ans2->inode_num].next;
+                ans2->fd = j;
+                break;
+            }
+        }
+        return ans2;
     }
     return NULL;
 }
@@ -469,10 +506,10 @@ int main(){
     mymount2("test", "/", "naamat", 1, NULL);
 
     // testing myopen, myread, mywrite, mylseek, myclose
-    int fd1 = myopen("eylon", 0); // open for read
+    int fd1 = myopen("eylon", O_RDONLY | O_CREAT); // open for read
     assert(!strcmp(open_files[fd1].curr_inode.name, "eylon"));
     assert(open_files[fd1].curr_inode.type == 0);
-    int fd2 = myopen("eylon", 1); // open for write
+    int fd2 = myopen("eylon", O_WRONLY); // open for write
     assert(!strcmp(open_files[fd2].curr_inode.name, "eylon"));
     assert(open_files[fd2].curr_inode.type == 0);
 
@@ -490,7 +527,7 @@ int main(){
     assert(bytes1 == 7);
     assert(!strcmp("michael", buf));
 
-    int fd3 = myopen("eylon", 2); // read and write
+    int fd3 = myopen("eylon", O_RDWR); // read and write
     assert(!strcmp(open_files[fd3].curr_inode.name, "eylon"));
     bytes1 = mywrite(fd3, "ao", 2);
     assert(bytes1 == 2);
@@ -526,11 +563,11 @@ int main(){
 
     // testing the dir function - myopendir, myreaddir, myclosedir
 
-    int f1 = myopen("netzer", 0);
-    int f2 =myopen("mordechai", 1);
-    int f3 =myopen("noam", 2);
-    int f4 =myopen("OS", 0);
-    int f5 =myopen("ex7", 1);
+    int f1 = myopen("netzer", O_CREAT | O_RDONLY);
+    int f2 =myopen("mordechai", O_WRONLY | O_CREAT);
+    int f3 =myopen("noam", O_RDWR | O_CREAT);
+    int f4 =myopen("OS", O_RDONLY | O_CREAT);
+    int f5 =myopen("ex7", O_WRONLY | O_CREAT);
 
     myclose(f1);
     myclose(f2);
@@ -570,5 +607,6 @@ int main(){
     for(int i = 0; i < MAX_FILES; ++i){
         assert(open_files[i].flag == -1);
     }
+
 }
 
