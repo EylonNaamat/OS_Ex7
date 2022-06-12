@@ -514,6 +514,7 @@ int main(){
     assert(open_files[fd2].curr_inode.type == 0);
 
     int bytes1 = mywrite(fd1, "naamat", 6); // should be an error - fd1 is open to read
+
     assert(bytes1 == -3);
 
     char buf[256];
@@ -532,17 +533,17 @@ int main(){
     bytes1 = mywrite(fd3, "ao", 2);
     assert(bytes1 == 2);
     char buf2[256];
-    mylseek(fd3, 0, 0);
+    mylseek(fd3, 0, SEEK_SET);
     bytes2 = myread(fd3, buf2, 7);
     assert(bytes2 == 7);
 
     assert(!strcmp("aochael", buf2));
 
-    mylseek(fd2, 0, 0);
+    mylseek(fd2, 0, SEEK_SET);
     bytes1 = myclose(fd2);
     bytes1 = mywrite(fd2, "os_course", 9);
     assert(bytes1 == -2);
-    mylseek(fd3, 0, 0);
+    mylseek(fd3, 0, SEEK_SET);
     myread(fd3, buf2, 9);
     assert(!strcmp(buf2, "aochael"));
 
@@ -551,9 +552,9 @@ int main(){
     myread(fd3, buf3, 9);
     assert(!strcmp(buf3, "aochael"));
 
-    bytes1 = mylseek(fd3, -1, 2);
+    bytes1 = mylseek(fd3, -1, SEEK_END);
     bytes1 = mywrite(fd3, "hello", 5);
-    bytes1 = mylseek(fd3, -1,2);
+    bytes1 = mylseek(fd3, -1,SEEK_END);
 
     char buf4[256];
     myread(fd3, buf4, 5);
