@@ -84,6 +84,20 @@ myDIR *myopendir(const char* name);
 struct mydirent *myreaddir(myDIR *dirp);
 int myclosedir(myDIR * dirp);
 
+char* get_inode_name(int index);
+char* get_name(int fd);
+int get_type(int fd);
+int get_flag(int fd);
+int get_seek(int fd);
+int get_length(int block_num);
+int get_block_num(int fd);
+void drain_data(int block_num);
+
+int length_to_read(int fd);
+
+int read_until(int fd, char* buf);
+
+
 //// global variables
 //super_block_point superb;
 //inode_point inodes;
